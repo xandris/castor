@@ -1,0 +1,7 @@
+*.o
+.deps/
+.*.sw[ponmlkj]
+.sw[ponmlkj]
+*.pem
+tags
+/main

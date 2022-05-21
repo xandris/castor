@@ -19,13 +19,16 @@ class Server : boost::noncopyable {
   void run();
 
  private:
+  bool is_shutdown;
   io_context io;
   ssl::context ssl_context;
   std::set<std::shared_ptr<Client>> clients;
+  acceptor sock;
 
   awaitable<void> do_run(const tcp::endpoint);
   void client_finished(std::shared_ptr<Client> client);
-  awaitable<void> timeout(timer::duration d);
+  void on_signal(err ec, int sig);
+  void shutdown() noexcept;
 };
 
 #endif

@@ -4,7 +4,11 @@
 #include "types.hpp"
 
 #include <boost/asio.hpp>
+#define saved_BOOST_ASIO_NO_DEPRECATED BOOST_ASIO_NO_DEPRECATED
+#undef BOOST_ASIO_NO_DEPRECATED
 #include <boost/asio/experimental/as_tuple.hpp>
+#define BOOST_ASIO_NO_DEPRECATED saved_BOOST_ASIO_NO_DEPRECATED 
+#undef saved_BOOST_ASIO_NO_DEPRECATED 
 #include <boost/asio/experimental/awaitable_operators.hpp>
 #include <boost/asio/ssl.hpp>
 
@@ -14,7 +18,6 @@ namespace {
     using namespace asio::experimental::awaitable_operators;
     using asio::experimental::as_tuple;
     using asio::ip::tcp;
-    using namespace std::literals::chrono_literals;
 
     using asio::experimental::as_tuple_t;
     using executor = asio::use_awaitable_t<asio::any_io_executor>::executor_with_default<asio::any_io_executor>;

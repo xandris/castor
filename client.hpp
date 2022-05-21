@@ -14,9 +14,12 @@ class Client : boost::noncopyable {
  public:
   Client(Server*, ssl_socket&&);
 
-  boost::asio::awaitable<void> run();
+  awaitable<void> run();
+  awaitable<void> timeout();
+  void close();
 
  private:
+  timer _timeout;
   ssl_socket peer;
   Server *server;
 };

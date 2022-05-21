@@ -6,3 +6,4 @@
 *.pem
 tags
 /main
+/test_uri

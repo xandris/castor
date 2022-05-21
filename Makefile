@@ -1,18 +1,26 @@
-CFLAGS=-std=gnu++20 -pipe -Werror -Og -ggdb -lstdc++
+CFLAGS=-std=c++20 -pipe -Werror -Og -ggdb
+LDFLAGS=-Wl,--as-needed
 CC=g++
 LD=g++
-OBJS=main.o server.o client.o
-SRCS=main.cpp server.cpp client.cpp
+OBJS=server.o client.o uri.o
+SRCS=main.cpp server.cpp client.cpp uri.cpp test_uri.cpp
+TESTS=test_uri
 
 .PHONY: clean all
 
 all: main
 
 clean:
-	rm -f *.o main
+	rm -f *.o main $(TESTS)
 
-main: $(OBJS)
+main: main.o $(OBJS)
 	$(LD) -lssl -lcrypto $(LDFLAGS) $+ -o $@
+
+tests: $(TESTS)
+	for i in $(TESTS); do ./"$$i" || exit $$?; done
+
+test_uri : test_uri.o uri.o
+	$(LD) $(CFLAGS) $(LDFLAGS) $+ -o $@
 
 DEPDIR := .deps
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d

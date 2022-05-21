@@ -18,10 +18,6 @@
 #include <thread>
 #include <vector>
 
-#include <boost/core/demangle.hpp>
-#include <boost/system/system_error.hpp>
-#include <boost/system/error_code.hpp>
-
 using std::array;
 using std::cerr;
 using std::cout;
@@ -39,7 +35,5 @@ using std::vector;
 using namespace std::literals::string_literals;
 using namespace std::literals::chrono_literals;
 
-using system_error = boost::system::system_error;
-using err = boost::system::error_code;
 
 #endif

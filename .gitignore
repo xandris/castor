@@ -1,4 +1,5 @@
 *.o
+*.d
 .deps/
 .*.sw[ponmlkj]
 .sw[ponmlkj]

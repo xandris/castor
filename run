@@ -2,5 +2,5 @@
 
 set -Eeuo pipefail
 
-make -s main
+make -j"$(nproc)" -s main
 exec ./main "$@"

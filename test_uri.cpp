@@ -81,4 +81,33 @@ void test_uri_view() {
            {scheme : "foo", path : "/", query : "asdf=zxcv"});
 }
 
+void test_uri() {
+  Uri u1{"p1://p2:p3/p4?p5"};
+
+  /* Exercise all the constructors and assignments. */
+  {
+    Uri u2{u1};
+    expect(u2==u1);
+  }
+
+  {
+    Uri u2{UriView(u1)};
+    expect(u2==u1);
+  }
+
+  {
+    Uri u2{"zxcv"};
+    expect(u2!=u1);
+    u2=u1;
+    expect(u2==u1);
+  }
+
+  {
+    Uri u2{u1};
+    Uri u3{std::move(u2)};
+    expect(u2==Uri{""});
+    expect(u3==u1);
+  }
+}
+
 int main() { test_uri_view(); }

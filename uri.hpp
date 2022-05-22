@@ -42,20 +42,70 @@ class Uri;
 class UriView {
  public:
   UriView(string_view uri);
-  string_view scheme() const;
-  string_view host() const;
-  string_view port() const;
-  string_view path() const;
-  string_view query() const;
+  string_view scheme() const,
+  host() const,
+  port() const,
+  path() const,
+  query() const;
 
- private:
+  // Assemble a new URI string from parts
+  operator string() const;
+
+  // Compare with another UriView
+  friend auto operator<=>(const UriView& a, const UriView& b) = default;
+
+  friend std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os,
+                                              const UriView&);
+
+ protected:
   string_view _scheme, _host, _port, _path, _query;
 };
 
 /*
  * Uri segments a URI into its component parts. Unlike UriView, it owns
- * memory, and so is always valid.
+ * memory, and so is always valid. It can decode its parts because it
+ * owns the memory.
  */
-class Uri : UriView {};
+class Uri : public UriView {
+ public:
+  // Parse a string, copying its storage.
+  explicit Uri(const string&);
+  // Parse a string, taking its storage.
+  explicit Uri(string&&);
+  // Assemble a new Uri string from existing parts.
+  Uri(const UriView&);
+  // Copy an existing Uri, pointing UriView at the new storage.
+  Uri(const Uri&);
+  // Copy an existing Uri, taking its storage.
+  Uri(Uri&&) = default;
+
+  // Get a copy of this Uri's storage.
+  // TODO: This may not be a valid URL because the parts have been decoded.
+  string str() const;
+  const string& ref() const;
+
+  // Compare with another Uri or UriView
+  // bool operator==(const Uri&) const;
+  // bool operator==(const UriView&) const;
+  friend std::strong_ordering operator<=>(const Uri&, const Uri&);
+
+  friend std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os,
+                                              const Uri&);
+
+  // Replace this Uri by copying the contents of another one.
+  Uri& operator=(const Uri&);
+  // Replace this Uri by taking the storage of another one.
+  Uri& operator=(Uri&&) = default;
+  // Get a copy of this Uri's storage.
+  operator string() const;
+  // Get a reference to this Uri's storage.
+  operator const string&() const;
+  // Get a view of this Uri's storage.
+  operator string_view() const;
+
+ private:
+  void normalize();
+  string s;
+};
 
 #endif

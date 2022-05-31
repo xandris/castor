@@ -1,5 +1,7 @@
 #include "server.hpp"
 
+#include <algorithm>
+
 #include "client.hpp"
 #include "net-types.hpp"
 
@@ -43,8 +45,8 @@ void report_sock_opts(const acceptor& sock) {
 
 }  // namespace
 
-Server::Server(ssl::context&& ctx)
-    : io{}, ssl_context{std::move(ctx)}, sock{io} {}
+Server::Server(ssl::context&& ctx, const std::map<std::filesystem::path, Handler>& handlers)
+    : ssl_context{std::move(ctx)}, handlers{handlers}, sock{io} {}
 
 void Server::run() {
   std::exception_ptr exc;
@@ -81,11 +83,15 @@ awaitable<void> Server::do_run(const tcp::endpoint ep) {
         peer.lowest_layer().close();
         break;
       }
-      auto client = std::make_shared<Client>(this, std::move(peer));
-      clients.insert(client);
+      auto client = std::make_shared<Client>(*this, std::move(peer));
+      auto sig = std::make_unique<asio::cancellation_signal>();
+      clients.insert(sig.get());
       co_spawn(
           io, client->run() || client->timeout(),
-          [&, client](std::exception_ptr e, auto) { clients.erase(client); });
+          asio::bind_cancellation_slot(
+              sig->slot(),
+              [&, client, sig = std::move(sig)](
+                  std::exception_ptr e, auto&&) { clients.erase(sig.get()); }));
     }
   } catch (const system_error& e) {
     if (e.code().value() != asio::error::operation_aborted) {
@@ -115,7 +121,74 @@ void Server::shutdown() noexcept {
   } catch (...) {
   }
 
-  std::ranges::for_each(clients, [](shared_ptr<Client> ptr) { ptr->close(); });
+  std::ranges::for_each(
+      clients, [](auto ptr) { ptr->emit(asio::cancellation_type::terminal); });
 
   clients.clear();
+}
+
+/*
+ * is_parent_path(parent, child) checks if the child path is lexically contained
+ * within the parent path. parent and child must both be absolute,
+ * lexically-normal paths. The result is undefined otherwise.
+ */
+bool is_parent_path(const std::filesystem::path& parent,
+                              const std::filesystem::path& child) {
+  auto &p{parent.native()}, &c{child.native()};
+  // Path p is a 'parent' of c (and x is not) if and only if:
+  // - c has a prefix of p and p ends with a path separator:
+  //   p: /asdf/zxcv/
+  //   c: /asdf/zxcv/qwerty
+  //   x: /asdf/zxcvqwerty
+  // - c has a prefix of p and the next character after the prefix
+  //   is the path separator or the end of the string:
+  //   p: /asdf/zxcv
+  //   c: /asdf/zxcv/qwerty
+  //   c: /asdf/zxcv
+  //   x: /asdf/zxcvqwerty
+  if (!c.starts_with(p)) {
+    return false;
+  }
+  if (p.ends_with(std::filesystem::path::preferred_separator)) {
+    return true;
+  }
+  string_view rest{c.begin() + p.length(), c.end()};
+  return rest.starts_with(std::filesystem::path::preferred_separator);
+}
+
+/*
+ * relative_path(parent, child) returns the portion of child following parent if
+ * child is relative to child, or nothing. parent and child must both be
+ * absolute, lexically-normal paths. The result is undefined otherwise.
+ */
+std::optional<std::filesystem::path> relative_path(
+    const std::filesystem::path& parent, const std::filesystem::path& child) {
+  auto &p{parent.native()}, &c{child.native()};
+  if (!c.starts_with(p)) {
+    return {};
+  }
+  string_view rest;
+  if (p.ends_with(std::filesystem::path::preferred_separator)) {
+    rest = {c.begin() + p.length() - 1, c.end()};
+  } else {
+    rest = {c.begin() + p.length(), c.end()};
+    if (!rest.starts_with(std::filesystem::path::preferred_separator)) {
+      return {};
+    }
+  }
+  return std::filesystem::path(rest);
+}
+
+std::optional<pair<std::reference_wrapper<Handler>, std::filesystem::path>>
+Server::handler_for(const std::filesystem::path& p) {
+  auto it = handlers.lower_bound(p);
+  if (it != handlers.end() && it->first == p)
+    return {{std::ref(it->second), std::filesystem::path{"/"}}};
+  if(it == handlers.begin())
+    return {};
+  --it;
+  auto pathinfo = relative_path(it->first, p);
+  if (!pathinfo)
+    return {};
+  return {{std::ref(it->second), *pathinfo}};
 }

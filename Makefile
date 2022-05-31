@@ -1,9 +1,9 @@
 CFLAGS=-std=c++20 -pipe -Werror -Og -ggdb
-LDFLAGS=-Wl,--as-needed
+LDFLAGS=$(CFLAGS) -Wl,--as-needed
 CC=g++
 LD=g++
-OBJS=server.o client.o uri.o
-SRCS=main.cpp server.cpp client.cpp uri.cpp test_uri.cpp
+OBJS=server.o client.o uri.o response.o
+SRCS=main.cpp server.cpp client.cpp uri.cpp test_uri.cpp request.cpp response.cpp
 TESTS=test_uri
 
 .PHONY: clean all
@@ -14,6 +14,9 @@ clean:
 	rm -f *.o main $(TESTS)
 
 main: main.o $(OBJS)
+	$(LD) -lssl -lcrypto $(LDFLAGS) $+ -o $@
+
+test_cancel: test_cancel.o
 	$(LD) -lssl -lcrypto $(LDFLAGS) $+ -o $@
 
 tests: $(TESTS)

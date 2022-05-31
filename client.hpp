@@ -12,7 +12,7 @@ class Client;
 
 class Client : boost::noncopyable {
  public:
-  Client(Server*, ssl_socket&&);
+  Client(Server &, ssl_socket &&);
 
   awaitable<void> run();
   awaitable<void> timeout();
@@ -21,7 +21,7 @@ class Client : boost::noncopyable {
  private:
   timer _timeout;
   ssl_socket peer;
-  Server *server;
+  Server &server;
 };
 
 #endif

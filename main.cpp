@@ -1,5 +1,7 @@
 #include <filesystem>
 
+#include "handler.hpp"
+#include "handler/dir.hpp"
 #include "net-types.hpp"
 #include "request.hpp"
 #include "response.hpp"
@@ -12,13 +14,7 @@ int main(int argc, char *argv[]) {
     ssl_context.use_private_key_file("certs/privkey.pem", ssl::context::pem);
 
     std::map<std::filesystem::path, Handler> handlers{
-        {"/asdf", Handler{[](const Request &req, Response &res) -> awaitable<void> {
-           res.header(Response::code_t::success, "text/gemini");
-           co_await res.flush_header();
-           auto buffers = {asio::buffer("Hello, world! You asked for:\n"),
-                           asio::buffer(req.path_info.native())};
-           co_await asio::async_write(res.socket, buffers);
-         }}}};
+        {"/asdf", DirHandler{"geminiroot"}}};
     Server server{std::move(ssl_context), handlers};
     server.run();
   } catch (std::exception &e) {

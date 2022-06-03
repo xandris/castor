@@ -9,4 +9,4 @@ concept HandlerFunc = std::default_initializable<T> && std::movable<T> && requir
   { t(r) } -> std::same_as<void>;
 };
 
-using Handler = std::function<awaitable<void>(Request&, Response&)>;
+using Handler = std::function<awaitable<void>(const Request&, Response&)>;

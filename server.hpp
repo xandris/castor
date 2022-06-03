@@ -1,14 +1,11 @@
-#ifndef SERVER_HPP
-#define SERVER_HPP
+#pragma once
 
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
+class Server;
+
 #include <boost/core/noncopyable.hpp>
 #include <filesystem>
 #include <functional>
 #include <set>
-
-class Server;
 
 #include "client.hpp"
 #include "handler.hpp"
@@ -17,17 +14,18 @@ class Server;
 
 class Server : boost::noncopyable {
  public:
-  explicit Server(ssl::context&&, const std::map<std::filesystem::path, Handler>&);
+  explicit Server(ssl::context&&,
+                  const std::map<std::filesystem::path, Handler>&);
 
   void run();
-  std::optional<pair<std::reference_wrapper<Handler>, std::filesystem::path>> handler_for(
-      const std::filesystem::path& p);
+  std::optional<pair<std::reference_wrapper<Handler>, std::filesystem::path>>
+  handler_for(const std::filesystem::path& p);
 
  private:
   bool is_shutdown{};
   io_context io{};
-  ssl::context ssl_context;
   std::set<asio::cancellation_signal*> clients{};
+  ssl::context ssl_context;
   std::map<std::filesystem::path, Handler> handlers;
   acceptor sock;
 
@@ -36,5 +34,3 @@ class Server : boost::noncopyable {
   void on_signal(err ec, int sig);
   void shutdown() noexcept;
 };
-
-#endif

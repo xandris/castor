@@ -1,4 +1,4 @@
-CFLAGS=-std=c++20 -pipe -Werror -Og -ggdb
+CFLAGS=-std=c++20 -pipe -Werror -Og -ggdb -fstack-protector-strong -fsanitize=address -fsanitize=undefined
 LDFLAGS=$(CFLAGS) -Wl,--as-needed
 CC=g++
 LD=g++
@@ -14,7 +14,7 @@ clean:
 	rm -f *.o main $(TESTS)
 
 main: main.o $(OBJS)
-	$(LD) -lssl -lcrypto $(LDFLAGS) $+ -o $@
+	$(LD) -luring -lssl -lcrypto $(LDFLAGS) $+ -o $@
 
 test_cancel: test_cancel.o
 	$(LD) -lssl -lcrypto $(LDFLAGS) $+ -o $@

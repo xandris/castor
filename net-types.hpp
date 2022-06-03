@@ -1,20 +1,29 @@
-#ifndef NET_TYPES_HPP
-#define NET_TYPES_HPP
+#pragma once
 
-#include "types.hpp"
-
-#include <boost/core/demangle.hpp>
-#include <boost/system/system_error.hpp>
-#include <boost/system/error_code.hpp>
+#define BOOST_ASIO_NO_DEPRECATED
+#define BOOST_ASIO_HAS_IO_URING
 
 #include <boost/asio.hpp>
-#define saved_BOOST_ASIO_NO_DEPRECATED BOOST_ASIO_NO_DEPRECATED
+#include <boost/core/demangle.hpp>
+#include <boost/system/error_code.hpp>
+#include <boost/system/system_error.hpp>
+
+#ifdef BOOST_ASIO_NO_DEPRECATED
+#define saved_BOOST_ASIO_NO_DEPRECATED
 #undef BOOST_ASIO_NO_DEPRECATED
+#endif
+
 #include <boost/asio/experimental/as_tuple.hpp>
-#define BOOST_ASIO_NO_DEPRECATED saved_BOOST_ASIO_NO_DEPRECATED 
-#undef saved_BOOST_ASIO_NO_DEPRECATED 
+
+#ifdef saved_BOOST_ASIO_NO_DEPRECATED
+#define BOOST_ASIO_NO_DEPRECATED
+#undef saved_BOOST_ASIO_NO_DEPRECATED
+#endif
+
 #include <boost/asio/experimental/awaitable_operators.hpp>
 #include <boost/asio/ssl.hpp>
+
+#include "types.hpp"
 
 namespace {
 using system_error = boost::system::system_error;
@@ -32,11 +41,9 @@ using timer = asio::steady_timer::rebind_executor<executor>::other;
 using acceptor = tcp::acceptor::rebind_executor<executor>::other;
 using socket = asio::basic_stream_socket<tcp, executor>;
 using ssl_socket = asio::ssl::stream<socket>;
-using asio::io_context;
-using asio::awaitable;
 using asio::async_read_until;
+using asio::awaitable;
 using asio::co_spawn;
 using asio::detached;
-}
-
-#endif
+using asio::io_context;
+} // namespace

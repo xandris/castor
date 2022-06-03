@@ -1,7 +1,4 @@
-#ifndef TYPES_HPP
-#define TYPES_HPP
-
-#include "config.hpp"
+#pragma once
 
 #include <algorithm>
 #include <array>
@@ -35,6 +32,3 @@ using std::vector;
 using namespace std::literals::string_literals;
 using namespace std::literals::string_view_literals;
 using namespace std::literals::chrono_literals;
-
-
-#endif

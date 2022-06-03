@@ -1,14 +1,11 @@
-#ifndef CLIENT_HPP
-#define CLIENT_HPP
-
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
-#include <boost/core/noncopyable.hpp>
+#pragma once
 
 class Client;
 
 #include "net-types.hpp"
 #include "server.hpp"
+
+#include <boost/core/noncopyable.hpp>
 
 class Client : boost::noncopyable {
  public:
@@ -19,9 +16,7 @@ class Client : boost::noncopyable {
   void close();
 
  private:
-  timer _timeout;
-  ssl_socket peer;
   Server &server;
+  ssl_socket peer;
+  timer _timeout;
 };
-
-#endif

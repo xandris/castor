@@ -42,9 +42,9 @@ awaitable<MaybeReq> parse_request(ssl_socket &peer) {
   }
 }
 
-Client::Client(Server &server, ssl_socket &&peer)
-    : server{server},
-      peer{std::move(peer)},
+Client::Client(Server &_server, ssl_socket &&_peer)
+    : server{_server},
+      peer{std::move(_peer)},
       _timeout{peer.get_executor(), 10s} {}
 
 awaitable<void> Client::run() {
@@ -85,7 +85,6 @@ awaitable<void> Client::run() {
     cout << ip << " Error: " << typeid(e).name() << ' ' << e.what() << '\n';
   }
 
-  auto handle = peer.native_handle();
   cout << "Closing " << ip << '\n';
   co_await peer.async_shutdown();
 }

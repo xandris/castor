@@ -2,9 +2,6 @@
 
 #include <algorithm>
 
-#include "client.hpp"
-#include "net-types.hpp"
-
 namespace {
 
 string present_sockopt(const acceptor::linger& o) {
@@ -45,7 +42,8 @@ void report_sock_opts(const acceptor& sock) {
 
 }  // namespace
 
-Server::Server(ssl::context&& ctx, const std::map<std::filesystem::path, Handler>& handlers)
+Server::Server(ssl::context&& ctx,
+               const std::map<std::filesystem::path, Handler>& handlers)
     : ssl_context{std::move(ctx)}, handlers{handlers}, sock{io} {}
 
 void Server::run() {
@@ -85,13 +83,14 @@ awaitable<void> Server::do_run(const tcp::endpoint ep) {
       }
       auto client = std::make_shared<Client>(*this, std::move(peer));
       auto sig = std::make_unique<asio::cancellation_signal>();
-      clients.insert(sig.get());
-      co_spawn(
-          io, client->run() || client->timeout(),
-          asio::bind_cancellation_slot(
-              sig->slot(),
-              [&, client, sig = std::move(sig)](
-                  std::exception_ptr e, auto&&) { clients.erase(sig.get()); }));
+      auto& sig_ref = *sig;
+      clients.insert(&sig_ref);
+      co_spawn(io, client->run() || client->timeout(),
+               asio::bind_cancellation_slot(sig_ref.slot(),
+                                            [&, client, sig = std::move(sig)](
+                                                std::exception_ptr e, auto&&) {
+                                              clients.erase(sig.get());
+                                            }));
     }
   } catch (const system_error& e) {
     if (e.code().value() != asio::error::operation_aborted) {
@@ -133,7 +132,7 @@ void Server::shutdown() noexcept {
  * lexically-normal paths. The result is undefined otherwise.
  */
 bool is_parent_path(const std::filesystem::path& parent,
-                              const std::filesystem::path& child) {
+                    const std::filesystem::path& child) {
   auto &p{parent.native()}, &c{child.native()};
   // Path p is a 'parent' of c (and x is not) if and only if:
   // - c has a prefix of p and p ends with a path separator:
@@ -184,11 +183,9 @@ Server::handler_for(const std::filesystem::path& p) {
   auto it = handlers.lower_bound(p);
   if (it != handlers.end() && it->first == p)
     return {{std::ref(it->second), std::filesystem::path{"/"}}};
-  if(it == handlers.begin())
-    return {};
+  if (it == handlers.begin()) return {};
   --it;
   auto pathinfo = relative_path(it->first, p);
-  if (!pathinfo)
-    return {};
+  if (!pathinfo) return {};
   return {{std::ref(it->second), *pathinfo}};
 }

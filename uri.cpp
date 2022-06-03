@@ -38,13 +38,13 @@ std::errc decode(string &s) {
     auto right{in.find('%')};
     if (right == string_view::npos) {
       // No more '%' escapes
-      in.copy(out, in.length());
+      std::copy(in.begin(), in.end(), out);
       out += in.length();
       s.erase(string::iterator{out}, s.end());
       if (s.capacity() >> 1 > s.length()) s.shrink_to_fit();
       return std::errc();
     }
-    in.copy(out, right);
+    std::copy(in.begin(), in.begin()+right, out);
     out += right;
     in.remove_prefix(right);
   }
@@ -280,7 +280,7 @@ host:
   _host = p.host;
   _port = p.port;
 path:
-  _path = p.path;
+  _path = decoded_path;
 query : {
   auto maybeQuery = detail::parse_query(p.query);
   if (maybeQuery.index() == 1) {

@@ -67,6 +67,7 @@ void test_uri() {
     expect(u.fragment(), loc) == data.fragment;
   };
 
+  test_one("/asdf%20zxcv", {path : "/asdf zxcv"});
   test_one("gemini://example.com:1966/foo/bar?asdf=zxcv&hjkl=vbnm#xyzzy", {
     scheme : "gemini",
     host : "example.com",

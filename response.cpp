@@ -14,7 +14,7 @@ awaitable<void> Response::flush_header() {
   array<char, 3> codebuf{static_cast<char>('0' + cat), static_cast<char>('0' + code), ' '};
 
   auto buffers = {asio::buffer(codebuf.cbegin(), codebuf.size()),
-                  asio::buffer(meta),
+                  asio::buffer(string_view{meta}),
                   asio::buffer(CRLF)};
 
   co_await asio::async_write(socket, buffers);

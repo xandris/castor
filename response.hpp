@@ -37,7 +37,7 @@ struct Response {
 
   ssl_socket& socket;
   code_t code;
-  string_view meta;
+  string meta;
 
   void header(code_t, string_view);
 

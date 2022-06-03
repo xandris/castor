@@ -4,47 +4,64 @@
 #include <filesystem>
 #include <map>
 #include <system_error>
+#include <variant>
 
 #include "types.hpp"
 
 namespace url {
 
-/*
- * url_decode decodes '%' references in-place. It invalidates iterators obtained
+/**
+ * decodes '%' references in-place. It invalidates iterators obtained
  * from s. It returns std::errc::invalid_argument if s contains malformed %
  * sequences. The contents of s are undefined on error; make a copy if this is
  * an issue.
  */
 std::errc decode(string &);
 
-/*
- * url_decode decodes '%' references in the given string. It returns a pair of
+/**
+ * @brief Encodes non-URL codepoints as % sequences.
+ * 
+ * @return std::errc 
+ */
+string encode(string_view);
+
+/**
+ * decode(s) decodes '%' references in s. It returns a pair of
  * std::errc and std::string. std::errc is std::errc::invalid_argument if s
  * contains malformed % sequences. The contents of the string are undefined on
  * error.
  */
-pair<string, std::errc> decode(const string &);
+std::variant<string, std::errc> decode(string_view);
 
-/*
- * Uri segments a URI into its component parts. Unlike UriView, it owns
- * memory, and so is always valid. It can decode its parts because it
- * owns the memory.
+namespace detail {
+struct parser;
+}
+
+/**
+ * Uri segments a URI into its component parts. It owns
+ * memory and so is always valid.
  */
 class Uri {
+ public:
   using path_t = std::filesystem::path;
   using query_t = std::multimap<std::string, std::string>;
 
- public:
-  // Parse a Uri
-  Uri(string_view s);
+  // Parse a URI
+  Uri(string_view);
 
-  string_view scheme() const, host() const, port() const, fragment() const;
-  const path_t &path() const;
-  const query_t &query() const;
+  /// Parse a URI and resolve against a base URI
+  Uri(string_view, const Uri &);
+
+  string_view scheme() const noexcept, host() const noexcept,
+      port() const noexcept, fragment() const noexcept;
+  const path_t &path() const noexcept;
+  const query_t &query() const noexcept;
+
   friend std::strong_ordering operator<=>(const Uri &, const Uri &);
-
   friend std::basic_ostream<char> &operator<<(std::basic_ostream<char> &,
                                               const Uri &);
+
+  operator string() const;
 
  private:
   string _scheme;
@@ -54,10 +71,8 @@ class Uri {
   query_t _query;
   string _fragment;
 
-  struct _parser;
-
   // Internal constructor
-  Uri(_parser p);
+  Uri(detail::parser, const Uri *);
 };
 
 }  // namespace url

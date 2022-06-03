@@ -50,17 +50,19 @@ std::errc decode(string &s) {
   }
 }
 
-pair<string, std::errc> decode(const string &s) {
+std::variant<string, std::errc> decode(string_view s) {
   string t{s};
   auto ec{decode(t)};
-  return {t, ec};
+  if (ec != std::errc{}) return ec;
+  return t;
 }
 
-/*
- * Uri::_parser segments a URI into its component parts. It doesn't own memory,
- * it just views into an existing buffer, which must remain valid. (See Uri for
- * an owning version.) It also doesn't normalize the URL since it doesn't own
- * the memory.
+namespace detail {
+
+/**
+ * parser segments a URI into its component parts. It doesn't own memory,
+ * it just views into an existing buffer, which must remain valid. It also
+ * doesn't normalize the URL since it doesn't own the memory.
  *
  * For example, this URL:
  *
@@ -88,13 +90,13 @@ pair<string, std::errc> decode(const string &s) {
  *
  * Only Path is non-empty.
  */
-struct Uri::_parser {
+struct parser {
   string_view scheme, host, port, path, query, fragment;
 
-  _parser(string_view);
+  parser(string_view);
 };
 
-Uri::_parser::_parser(string_view uri) {
+parser::parser(string_view uri) {
   // [scheme:[//host[:port]]/]path[?query][#fragment]
   // If there is a colon before the first slash, question mark, or pound,
   // treat it as the scheme delimiter.
@@ -150,30 +152,196 @@ Uri::_parser::_parser(string_view uri) {
   }
 }
 
+std::variant<Uri::query_t, std::errc> parse_query(string_view s) {
+  Uri::query_t ret;
+  string k, v;
+  std::errc ec;
+
+  for (string_view::size_type right{0}; !s.empty();
+       s.remove_prefix(right + (right != s.length()))) {
+    right = s.find('&');
+    if (right == string_view::npos) {
+      right = s.length();
+    }
+    auto eq = s.substr(0, right).find('=');
+    if (eq == string_view::npos) {
+      k = s.substr(0, right);
+      ec = decode(k);
+      v = "";
+    } else {
+      k = s.substr(0, eq);
+      v = s.substr(eq + 1, right - eq - 1);
+      ec = decode(k);
+      if (ec == std::errc{}) {
+        ec = decode(v);
+      }
+    }
+
+    if (ec != std::errc{}) {
+      return ec;
+    }
+
+    ret.insert({k, v});
+  }
+
+  return ret;
+}
+
+const string_view urlchars{
+    "!$&'()*+,-./"
+    "0123456789:;=?@ABCDEFGHIJKLMNOPQRSTUVWXYZ_~abcdefghijklmnopqrstuvwxyz"};
+const string_view path_urlchars{
+    "!$&'()*+,-./"
+    "0123456789:;=@ABCDEFGHIJKLMNOPQRSTUVWXYZ_~abcdefghijklmnopqrstuvwxyz"};
+const string_view query_urlchars{
+    "!$'()*+,-./"
+    "0123456789:;=?@ABCDEFGHIJKLMNOPQRSTUVWXYZ_~abcdefghijklmnopqrstuvwxyz"};
+
+struct urlencoder {
+  string_view s;
+  string_view allowed{urlchars};
+};
+
+std::ostream &operator<<(std::ostream &os, const urlencoder &u) {
+  for (auto s = u.s; !s.empty();) {
+    auto right = s.find_first_not_of(u.allowed);
+    if (right == string_view::npos) {
+      os << s;
+      break;
+    }
+    os << s.substr(0, right) << '%' << std::setw(2) << std::setfill('0') << std::hex << int{s[right]};
+    s.remove_prefix(right + 1);
+  }
+  return os;
+}
+
+}  // namespace detail
+
+string encode(string_view s) {
+  std::ostringstream os;
+  os << detail::urlencoder{s};
+  return os.str();
+}
+
 /*
  * URI IMPLEMENTATION
  */
-Uri::Uri(string_view s) : Uri{Uri::_parser{s}} {}
-Uri::Uri(Uri::_parser p)
-    : _scheme{p.scheme}, _host{p.host}, _port{p.port}, _query{} {
-  string dec{p.path};
-  if (decode(dec) != std::errc()) {
+Uri::Uri(string_view s) : Uri{detail::parser{s}, nullptr} {}
+Uri::Uri(string_view s, const Uri &base) : Uri{detail::parser{s}, &base} {}
+Uri::Uri(detail::parser p, const Uri *base) {
+  string decoded_path{p.path};
+  if (decode(decoded_path) != std::errc()) {
     throw std::invalid_argument{"Invalid URL"};
   }
-  _path = path_t{std::move(dec)}.lexically_normal();
+  string decoded_fragment{p.fragment};
+  if (decode(decoded_fragment) != std::errc()) {
+    throw std::invalid_argument{"Invalid URL"};
+  }
 
-  dec = p.fragment;
-  if (decode(dec) != std::errc()) {
-    throw std::invalid_argument{"Invalid URL"};
+  if (base) {
+    if (!p.scheme.empty()) {
+      goto scheme;
+    }
+    _scheme = base->_scheme;
+    if (!(p.host.empty() && p.port.empty())) {
+      goto host;
+    }
+    _host = base->_host;
+    _port = base->_port;
+
+    if (decoded_path.starts_with('/')) {
+      goto path;
+    }
+
+    if (p.path.empty()) {
+      _path = base->_path;
+    } else {
+      _path = base->_path;
+      _path.replace_filename(decoded_path);
+      goto query;
+    }
+
+    if (!p.query.empty()) {
+      goto query;
+    }
+    _query = base->_query;
+
+    if (!p.fragment.empty()) {
+      goto fragment;
+    }
+    _fragment = base->_fragment;
+
+    goto fixup;
   }
-  _fragment = std::move(dec);
+
+scheme:
+  _scheme = p.scheme;
+host:
+  _host = p.host;
+  _port = p.port;
+path:
+  _path = p.path;
+query : {
+  auto maybeQuery = detail::parse_query(p.query);
+  if (maybeQuery.index() == 1) {
+    throw std::invalid_argument{"Invalid URL"};
+  } else {
+    _query = std::move(std::get<0>(maybeQuery));
+  }
+}
+fragment:
+  _fragment = p.fragment;
+fixup:
+  _path = _path.lexically_normal();
 }
 
-string_view Uri::scheme() const { return _scheme; }
-string_view Uri::host() const { return _host; }
-string_view Uri::port() const { return _port; }
-const Uri::path_t &Uri::path() const { return _path; }
-const Uri::query_t &Uri::query() const { return _query; }
-string_view Uri::fragment() const { return _fragment; }
+string_view Uri::scheme() const noexcept { return _scheme; }
+string_view Uri::host() const noexcept { return _host; }
+string_view Uri::port() const noexcept { return _port; }
+const Uri::path_t &Uri::path() const noexcept { return _path; }
+const Uri::query_t &Uri::query() const noexcept { return _query; }
+string_view Uri::fragment() const noexcept { return _fragment; }
+
+Uri::operator string() const {
+  std::ostringstream os;
+  os << *this;
+  return os.str();
+}
+
+std::ostream &operator<<(std::ostream &os, const Uri &u) {
+  if (!u.scheme().empty()) {
+    os << detail::urlencoder{u.scheme()} << ':';
+  }
+  if (!(u.host().empty() && u.port().empty())) {
+    os << "//" << detail::urlencoder{u.host()};
+    if (!u.port().empty()) {
+      os << ':' << detail::urlencoder{u.port()};
+    }
+    if (!u.path().empty() && u.path().is_relative()) {
+      os << '/';
+    }
+  }
+  os << detail::urlencoder{u.path().native(), detail::path_urlchars};
+  if (!u.query().empty()) {
+    os << '?';
+    auto first{true};
+
+    for (auto &[k, v] : u.query()) {
+      if (!first) {
+        os << '&';
+      }
+      first = false;
+
+      os << detail::urlencoder{k, detail::query_urlchars};
+      if (!v.empty()) {
+        os << '=' << detail::urlencoder{v, detail::query_urlchars};
+      }
+    }
+  }
+  if (!u.fragment().empty()) {
+    os << '#' << detail::urlencoder{u.fragment()};
+  }
+  return os;
+}
 
 }  // namespace url

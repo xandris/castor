@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NET_TYPES_HPP
+#define NET_TYPES_HPP
 
 #define BOOST_ASIO_NO_DEPRECATED
 #define BOOST_ASIO_HAS_IO_URING
@@ -47,3 +48,5 @@ using asio::co_spawn;
 using asio::detached;
 using asio::io_context;
 } // namespace
+
+#endif
